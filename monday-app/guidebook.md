@@ -1,124 +1,98 @@
-# 📖 GUIDEBOOK: Membangun FlowBoard dari Nol (Monday.com GraphQL API + Next.js)
-
-Selamat datang di **Guidebook Pembuatan Aplikasi FlowBoard** dari awal (*from scratch*) sampai menjadi aplikasi manajemen task yang terintegrasi penuh secara live dengan **Monday.com GraphQL API v2** seperti yang telah selesai kita buat!
-
----
-
-## 📑 Daftar Isi
-1. [Target Hasil Akhir Aplikasi](#1-target-hasil-akhir-aplikasi)
-2. [Prasyarat & Konsep Kunci](#2-prasyarat--konsep-kunci)
-3. [Langkah 1: Inisialisasi Project Next.js & Dependensi](#langkah-1-inisialisasi-project-nextjs--dependensi)
-4. [Langkah 2: Menyiapkan Kredensial Monday.com & Variabel Lingkungan](#langkah-2-menyiapkan-kredensial-mondaycom--variabel-lingkungan)
-5. [Langkah 3: Menentukan Tipe Data Task (`lib/task.ts`)](#langkah-3-menentukan-tipe-data-task-libtaskts)
-6. [Langkah 4: Menulis Pustaka GraphQL Query & Mutation (`lib/graphql.ts`)](#langkah-4-menulis-pustaka-graphql-query--mutation-libgraphqlts)
-7. [Langkah 5: Membuat Client Helper Monday.com (`lib/monday.ts`)](#langkah-5-membuat-client-helper-mondaycom-libmondayts)
-8. [Langkah 6: Membangun Backend API Route Next.js (`app/api/monday/route.ts`)](#langkah-6-membangun-backend-api-route-nextjs-appapimondayroutets)
-9. [Langkah 7: Konfigurasi Styling, Font & Warna Monday (`app/globals.css` & `app/layout.tsx`)](#langkah-7-konfigurasi-styling-font--warna-monday-appglobalscss--applayouttsx)
-10. [Langkah 8: Menyiapkan Komponen UI (`components/ui/`)](#langkah-8-menyiapkan-komponen-ui-componentsui)
-11. [Langkah 9: Membangun Halaman Utama & GraphQL Explorer (`app/page.tsx`)](#langkah-9-membangun-halaman-utama--graphql-explorer-apppagetsx)
-12. [Langkah 10: Menjalankan & Menguji Aplikasi Secara Live](#langkah-10-menjalankan--menguji-aplikasi-secara-live)
-13. [Troubleshooting & FAQ](#13-troubleshooting--faq)
+# 📘 PANDUAN LENGKAP: Memahami FlowBoard & Monday.com GraphQL API v2
+> **Pedoman Belajar Ramah Pemula & Junior Developer**  
+> Ditulis secara runtut: *Mengapa dibuat seperti ini? Apa fungsi baris ini? Bagaimana data mengalir dari klik tombol hingga ke server Monday.com?*
 
 ---
 
-## 1. Target Hasil Akhir Aplikasi
-
-Aplikasi akhir yang kita bangun memiliki kemampuan:
-* 🟢 **Live Sync Monday.com**: Membaca otomatis board dan task akun Monday.com Anda via GraphQL API v2.
-* 📊 **Ringkasan Metrik**: Kartu hitung jumlah Total Task, To Do, Working on it, dan Done dengan progress bar penyelesaian.
-* 📋 **Tampilan Ganda**: Bisa beralih antara mode **Papan Kanban Kolom** dan mode **Daftar (List)**.
-* ⚡ **Ubah Status 1-Klik**: Klik badge status pada kartu (*To Do* ➔ *Working on it* ➔ *Done*), langsung tersinkronisasi ke Monday.com secara real-time (*Optimistic UI*).
-* ➕ **Tambah & Hapus Task**: Form pembuatan task baru yang langsung mendaftarkan baris item di board Monday.com Anda.
-* 🛠️ **GraphQL Explorer Interaktif**: Playground untuk menginspeksi dan mengeksekusi query GraphQL langsung ke endpoint `https://api.monday.com/v2` serta melihat JSON responnya.
-
----
-
-## 2. Prasyarat & Konsep Kunci
-
-### A. Mengapa Monday.com Menggunakan GraphQL?
-Monday.com menggunakan **GraphQL API v2** yang beralamat di:
-```
-POST https://api.monday.com/v2
-```
-* **Endpoint Tunggal**: Semua operasi (baca, tambah, ubah, hapus) dikirim ke satu URL yang sama dengan metode **HTTP POST**.
-* **Header Wajib**:
-  ```http
-  Authorization: <PERSONAL_API_TOKEN>
-  Content-Type: application/json
-  API-Version: 2024-01
-  ```
-* **Payload JSON**:
-  ```json
-  {
-    "query": "query { me { id name email } }",
-    "variables": {}
-  }
-  ```
+## 🎯 Daftar Isi
+1. [Analogi Sederhana: Memahami Seluruh Sistem](#1-analogi-sederhana-memahami-seluruh-sistem)
+2. [Peta Arsitektur & Alur Data (Data Flow Diagram)](#2-peta-arsitektur--alur-data-data-flow-diagram)
+3. [Daftar File & Perannya (Kenapa File Ini Harus Ada?)](#3-daftar-file--perannya-kenapa-file-ini-harus-ada)
+4. [Bedah Kode File per File: Kenapa Begitu? Apa Ini Apa Itu?](#4-bedah-kode-file-per-file-kenapa-begitu-apa-ini-apa-itu)
+   - [A. lib/task.ts (Model Data & Normalisasi)](#a-libtaskts-model-data--normalisasi)
+   - [B. lib/graphql.ts (Sintaks Query & Mutasi)](#b-libgraphqlts-sintaks-query--mutasi)
+   - [C. lib/monday.ts (Mesin Komunikasi API)](#c-libmondayts-mesin-komunikasi-api)
+   - [D. app/api/monday/route.ts (Satpam Backend & Jembatan CORS)](#d-appapimondayroutets-satpam-backend--jembatan-cors)
+   - [E. app/page.tsx (Antarmuka React & Optimistic UI)](#e-apppagetsx-antarmuka-react--optimistic-ui)
+5. [Pertanyaan Kritis yang Sering Ditanyakan Pemula (FAQ Junior)](#5-pertanyaan-kritis-yang-sering-ditanyakan-pemula-faq-junior)
+6. [Kamus Istilah untuk Junior Developer](#6-kamus-istilah-untuk-junior-developer)
+7. [Latihan Praktik Mandiri](#7-latihan-praktik-mandiri)
 
 ---
 
-## Langkah 1: Inisialisasi Project Next.js & Dependensi
+## 1. Analogi Sederhana: Memahami Seluruh Sistem
 
-1. Buat project baru Next.js dengan TypeScript, Tailwind CSS, dan App Router:
-   ```bash
-   npx create-next-app@latest monday-app --typescript --tailwind --eslint --app --src-dir=false
-   cd monday-app
-   ```
+Bayangkan sistem ini seperti sebuah **Restoran Modern**:
 
-2. Pasang library pendukung (Lucide Icons, Base UI, dan Utilitas ClassName):
-   ```bash
-   npm install lucide-react class-variance-authority @base-ui/react cn
-   ```
-
-3. Buat helper utilitas `lib/utils.ts`:
-   ```typescript
-   // lib/utils.ts
-   export { cn } from 'cn';
-   ```
+1. **Monday.com Cloud**: Adalah **Gudang Pusat Bahan Makanan**. Tempat semua data resmi (board, task, status) disimpan permanen.
+2. **Klien / Browser Anda (`app/page.tsx`)**: Adalah **Meja Tamu**. Tempat pengguna melihat menu, mengklik tombol, dan menikmati tampilan antarmuka (Kanban / List).
+3. **Backend Next.js API Route (`app/api/monday/route.ts`)**: Adalah **Pelayan Restoran**. Tamu di meja tidak boleh langsung masuk ke gudang pusat demi alasan keamanan (*keamanan token* & *aturan CORS*). Tamu memesan ke pelayan, lalu pelayan yang pergi ke gudang.
+4. **GraphQL (`lib/graphql.ts`)**: Adalah **Nota Pesanan Khusus**. Berbeda dengan REST API yang membawa satu paket makanan standar (sering kelebihan makanan), dengan GraphQL pelayan menulis: *"Saya hanya butuh 1 telur, nama task, dan statusnya saja"*. Gudang hanya mengirim yang diminta.
+5. **File `.env.local`**: Adalah **Kunci Brankas Pelayan**. Menyimpan kartu akses (*Personal API Token*) agar pelayan diizinkan masuk ke gudang Monday.com.
 
 ---
 
-## Langkah 2: Menyiapkan Kredensial Monday.com & Variabel Lingkungan
+## 2. Peta Arsitektur & Alur Data (Data Flow Diagram)
 
-### A. Cara Mengambil Personal API Token:
-1. Buka akun Anda di [Monday.com](https://monday.com).
-2. Klik **Avatar Profil** di pojok kiri bawah.
-3. Pilih **Developers** > tab **My Access Tokens**.
-4. Klik **Show** lalu **Copy** token Anda.
+Berikut alur lengkap yang terjadi ketika Anda membuka web atau mengklik status task:
 
-### B. Menemukan Board ID:
-Buka board kerja Anda di browser, perhatikan URL address:
-`https://workspace.monday.com/boards/5031976216` ➔ Board ID adalah `5031976216`.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Pengguna as 👤 Pengguna (Browser)
+    participant UI as 🖥️ React UI (app/page.tsx)
+    participant API as 🛡️ Next.js Route (app/api/monday)
+    participant Helper as ⚙️ Helper (lib/monday.ts)
+    participant Monday as ☁️ Monday.com (api.monday.com/v2)
 
-### C. Simpan di File `.env.local`:
-Buat file `.env.local` di root folder project:
-```env
-# .env.local
-MONDAY_API_KEY=eyJhbGciOiJIUzI1NiJ9...
-MONDAY_BOARD_ID=5031976216
-```
+    Note over Pengguna,UI: A. Membaca Data (Query)
+    Pengguna->>UI: Buka halaman http://localhost:3000
+    UI->>API: fetch('/api/monday')
+    API->>Helper: fetchMondayBoard(boardId, apiKey)
+    Helper->>Monday: POST GraphQL: query GetBoardItems($boardId)
+    Monday-->>Helper: Respon JSON Mentah { boards: [...] }
+    Helper->>Helper: Normalisasi kolom status (project_status -> TaskStatus)
+    Helper-->>API: Kembalikan objek Task[] yang rapi
+    API-->>UI: Respon JSON { isLive: true, tasks: [...] }
+    UI-->>Pengguna: Tampilkan kartu di kolom To Do, Working, Done
 
-Buat juga file `.env.example` sebagai referensi publik:
-```env
-# .env.example
-MONDAY_API_KEY=your_monday_personal_token_here
-MONDAY_BOARD_ID=your_board_id_here
-```
-
-Pastikan `.env.local` ada di `.gitignore`:
-```gitignore
-.env*
-!.env.example
+    Note over Pengguna,UI: B. Mengubah Status (Mutasi)
+    Pengguna->>UI: Klik tombol status "Working on it" -> "Done"
+    UI->>UI: [Optimistic UI] Ubah warna badge seketika di layar!
+    UI->>API: PATCH /api/monday { itemId, status: 'done' }
+    API->>Helper: updateMondayItemStatus(...)
+    Helper->>Monday: POST GraphQL: mutation change_simple_column_value
+    Monday-->>Helper: Respon Sukses { id: "..." }
+    Helper-->>API: Berhasil
+    API-->>UI: Status 200 OK
 ```
 
 ---
 
-## Langkah 3: Menentukan Tipe Data Task (`lib/task.ts`)
+## 3. Daftar File & Perannya (Kenapa File Ini Harus Ada?)
 
-Buat file `lib/task.ts` untuk mendefinisikan model task dan pemetaan warna khas Monday.com:
+| Nama File | Peran Utama | Jika File Ini Dihapus, Apa yang Terjadi? |
+|---|---|---|
+| **`.env.local`** | Menyimpan `MONDAY_API_KEY` dan `MONDAY_BOARD_ID` rahasia di komputer lokal Anda. | Aplikasi tidak bisa masuk ke akun Monday.com Anda dan akan berjalan di Mode Demo. |
+| **`lib/task.ts`** | Mendefinisikan bentuk data task TypeScript dan fungsi penerjemah label status. | TypeScript error karena aplikasi tidak tahu apa itu `Task`, `TaskStatus`, atau warna badge apa yang dipakai. |
+| **`lib/graphql.ts`** | Buku kamus yang berisi teks query dan mutasi GraphQL standar Monday.com. | Koding GraphQL berserakan di mana-mana dan sulit dirawat atau diuji di GraphQL Explorer. |
+| **`lib/monday.ts`** | Fungsi logika yang membungkus `fetch` ke server Monday.com dan menangani error. | Backend API Route harus menulis ulang logika HTTP fetch yang panjang berkali-kali. |
+| **`app/api/monday/route.ts`** | Backend server mini di Next.js untuk mencegah masalah CORS browser dan melindungi API key. | Browser akan menolak panggilan API ke Monday.com karena aturan keamanan *Cross-Origin Resource Sharing (CORS)*. |
+| **`app/page.tsx`** | Tampilan visual interaktif (Kanban Board, List View, Add Task, dan GraphQL Explorer). | Pengguna hanya melihat layar kosong karena tidak ada halaman depan. |
+| **`app/globals.css`** | Konfigurasi CSS Tailwind dan variabel warna khas Monday.com. | Tampilan web akan menjadi teks polos tanpa warna, tata letak, atau tombol yang indah. |
 
+---
+
+## 4. Bedah Kode File per File: Kenapa Begitu? Apa Ini Apa Itu?
+
+Mari kita bedah setiap file dengan kacamata orang yang baru belajar koding.
+
+---
+
+### A. `lib/task.ts` (Model Data & Normalisasi)
+
+#### 1. Mengapa Menggunakan `type` dan `interface`?
 ```typescript
-// lib/task.ts
 export type TaskStatus = 'todo' | 'working' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
@@ -126,35 +100,19 @@ export interface Task {
   id: string | number;
   title: string;
   status: TaskStatus;
-  priority?: TaskPriority;
+  priority?: TaskPriority; // Tanda tanya (?) berarti opsional (boleh kosong)
   assignedTo?: string;
   mondayId?: string;
   createdAt?: string;
 }
+```
+* **Kenapa tidak pakai `any`?**  
+  Jika kita memakai `any`, saat salah mengetik (misal `task.ststus`), editor tidak akan memberi tahu. Dengan `Task`, editor (VS Code) langsung memberi garis merah jika ada salah ketik.
+* **Kenapa `TaskStatus` dibatasi 3 nilai saja?**  
+  Agar alur sistem pasti dan terprediksi: task hanya boleh berada di salah satu dari 3 kolom Kanban: *To Do*, *Working on it*, atau *Done*.
 
-// Warna khas Monday.com
-export const STATUS_LABELS: Record<TaskStatus, { label: string; color: string; bg: string; dot: string }> = {
-  todo: {
-    label: 'To Do',
-    color: 'text-white font-medium',
-    bg: 'bg-[#579bfc] hover:bg-[#4388e8] shadow-xs active:scale-95',
-    dot: 'bg-[#579bfc]',
-  },
-  working: {
-    label: 'Working on it',
-    color: 'text-white font-medium',
-    bg: 'bg-[#fdab3d] hover:bg-[#e99a2c] shadow-xs active:scale-95',
-    dot: 'bg-[#fdab3d]',
-  },
-  done: {
-    label: 'Done',
-    color: 'text-white font-medium',
-    bg: 'bg-[#00c875] hover:bg-[#00b268] shadow-xs active:scale-95',
-    dot: 'bg-[#00c875]',
-  },
-};
-
-// Fungsi normalisasi dari teks label kolom Monday.com ke TaskStatus
+#### 2. Fungsi Normalisasi: Mengapa Ini Sangat Penting?
+```typescript
 export function normalizeMondayStatus(label?: string | null): TaskStatus {
   if (!label) return 'todo';
   const clean = label.toLowerCase().trim();
@@ -162,55 +120,24 @@ export function normalizeMondayStatus(label?: string | null): TaskStatus {
   if (clean.includes('work') || clean.includes('progress') || clean.includes('sedang')) return 'working';
   return 'todo';
 }
-
-// Mengembalikan label status resmi Monday.com
-export function toMondayStatusLabel(status: TaskStatus): string {
-  switch (status) {
-    case 'done': return 'Done';
-    case 'working': return 'Working on it';
-    default: return 'To Do';
-  }
-}
 ```
+* **Masalah di Dunia Nyata:**  
+  Di Monday.com, setiap orang bisa menamai status sesuka hati: ada yang menulis *"Done"*, ada yang menulis *"done"*, ada yang menulis *"Selesai"*, bahkan *"In Progress"*.
+* **Solusi Fungsi Ini:**  
+  Fungsi ini bertindak seperti penerjemah pintar: apa pun variasinya, aplikasi kita secara seragam memahaminya sebagai salah satu dari `'todo'`, `'working'`, atau `'done'`.
 
 ---
 
-## Langkah 4: Menulis Pustaka GraphQL Query & Mutation (`lib/graphql.ts`)
+### B. `lib/graphql.ts` (Sintaks Query & Mutasi)
 
-Buat file `lib/graphql.ts` untuk mengumpulkan seluruh query dan mutasi GraphQL secara terstruktur:
+File ini berisi teks GraphQL murni. Mari kita pahami sintaksnya:
 
-```typescript
-// lib/graphql.ts
-
-// 1. Query cek user aktif
-export const QUERY_ME = `
-query GetCurrentUser {
-  me {
-    id
-    name
-    email
-  }
-}
-`;
-
-// 2. Query daftar board milik akun
-export const QUERY_LIST_BOARDS = `
-query ListUserBoards {
-  boards(limit: 25, state: active) {
-    id
-    name
-    description
-  }
-}
-`;
-
-// 3. Query membaca data board & item
-export const QUERY_GET_BOARD_ITEMS = `
+#### 1. Membaca Item Board (Query)
+```graphql
 query GetBoardItems($boardId: [ID!]) {
   boards(ids: $boardId) {
     id
     name
-    description
     columns {
       id
       title
@@ -230,20 +157,22 @@ query GetBoardItems($boardId: [ID!]) {
     }
   }
 }
-`;
+```
 
-// 4. Mutasi membuat task baru
-export const MUTATION_CREATE_ITEM = `
-mutation CreateTaskItem($boardId: ID!, $itemName: String!) {
-  create_item(board_id: $boardId, item_name: $itemName) {
-    id
-    name
-  }
-}
-`;
+* **Kenapa ada kata `query` di depan?**  
+  Memberi tahu GraphQL server: *"Saya hanya ingin membaca data, tidak ada data yang diubah."*
+* **Apa maksud `$boardId: [ID!]`?**  
+  - Tanda `$` menandakan sebuah **variabel dinamis**. Nilainya tidak ditulis mati (*hardcode*) di dalam query, melainkan dikirimkan terpisah di objek `variables`.
+  - Tanda kurung siku `[...]` berarti bernilai **Array / List**.
+  - Tanda seru `!` berarti **Wajib diisi (Required / Non-nullable)**.
+* **Kenapa kita meminta `columns` dan `items_page` sekaligus?**  
+  Inilah keunggulan utama GraphQL! Dalam **satu kali kirim**, kita langsung mendapatkan:
+  1. Nama Board
+  2. Daftar kolom yang ada di board
+  3. 50 task pertama beserta isi nilai kolomnya!
 
-// 5. Mutasi mengubah nilai status
-export const MUTATION_UPDATE_STATUS = `
+#### 2. Mengubah Status Task (Mutation)
+```graphql
 mutation UpdateTaskStatus($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
   change_simple_column_value(
     board_id: $boardId,
@@ -254,429 +183,192 @@ mutation UpdateTaskStatus($boardId: ID!, $itemId: ID!, $columnId: String!, $valu
     id
   }
 }
-`;
-
-// 6. Mutasi menghapus item
-export const MUTATION_DELETE_ITEM = `
-mutation DeleteTaskItem($itemId: ID!) {
-  delete_item(item_id: $itemId) {
-    id
-  }
-}
-`;
-
-// Preset untuk GraphQL Explorer di UI
-export const GRAPHQL_PRESETS = [
-  {
-    name: '1. Cek Profil Akun (me)',
-    query: QUERY_ME,
-    variables: {},
-  },
-  {
-    name: '2. Daftar Papan Kerja (boards)',
-    query: QUERY_LIST_BOARDS,
-    variables: {},
-  },
-  {
-    name: '3. Baca Item Board (items_page)',
-    query: QUERY_GET_BOARD_ITEMS,
-    variables: { boardId: ['5031976216'] },
-  },
-  {
-    name: '4. Buat Task Baru (create_item)',
-    query: MUTATION_CREATE_ITEM,
-    variables: { boardId: '5031976216', itemName: 'Task Baru' },
-  },
-];
 ```
+* **Kenapa menggunakan kata `mutation`?**  
+  Di GraphQL, semua operasi yang **menambah, mengedit, atau menghapus** data WAJIB diawali dengan kata `mutation`.
+* **Mengapa memakai `change_simple_column_value`?**  
+  Monday.com menyediakan dua cara ubah kolom:
+  1. `change_column_value` (memerlukan payload string JSON rumit `{\"index\": 0}`).
+  2. `change_simple_column_value` (cukup kirim string sederhana seperti `"Done"` atau `"Working on it"`). Cara kedua jauh lebih mudah dipahami dan minim bug!
 
 ---
 
-## Langkah 5: Membuat Client Helper Monday.com (`lib/monday.ts`)
+### C. `lib/monday.ts` (Mesin Komunikasi API)
 
-File `lib/monday.ts` bertindak sebagai penghubung logika antara GraphQL dan aplikasi Next.js:
+File ini adalah jantung yang melakukan pengiriman data ke internet.
 
+#### 1. Fungsi Utama: `executeMondayGraphQL`
 ```typescript
-// lib/monday.ts
-import { Task, TaskPriority, TaskStatus, normalizeMondayStatus, toMondayStatusLabel } from './task';
-import {
-  QUERY_ME,
-  QUERY_LIST_BOARDS,
-  QUERY_GET_BOARD_ITEMS,
-  MUTATION_CREATE_ITEM,
-  MUTATION_UPDATE_STATUS,
-  MUTATION_DELETE_ITEM,
-} from './graphql';
-
-export const MONDAY_API_URL = 'https://api.monday.com/v2';
-
-// 1. Fungsi Umum Eksekutor GraphQL
 export async function executeMondayGraphQL<T = unknown>(
   query: string,
   variables: Record<string, unknown> = {},
   apiKey?: string
 ): Promise<T> {
+  // 1. Ambil token dari parameter atau dari .env.local
   const token = apiKey || process.env.MONDAY_API_KEY;
-  if (!token) throw new Error('API Key Monday.com belum disetel.');
 
-  const response = await fetch(MONDAY_API_URL, {
+  if (!token) {
+    throw new Error('API Key Monday.com belum disetel.');
+  }
+
+  // 2. Kirim permintaan HTTP POST ke endpoint resmi Monday
+  const response = await fetch('https://api.monday.com/v2', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: token,
-      'API-Version': '2024-01',
+      'API-Version': '2024-01', // Selalu kunci versi API agar tidak kena breaking changes
     },
     body: JSON.stringify({ query, variables }),
   });
 
+  // 3. Tangkap respon JSON
   const result = await response.json();
 
+  // 4. Deteksi error bawaan GraphQL
   if (result.errors && result.errors.length > 0) {
-    throw new Error(result.errors.map((e: any) => e.message).join(', '));
+    const errorMessage = result.errors.map((e: any) => e.message).join(', ');
+    throw new Error(`Monday.com GraphQL Error: ${errorMessage}`);
   }
 
   return result.data as T;
 }
-
-// 2. Fungsi Tes Koneksi
-export async function testMondayConnection(apiKey?: string) {
-  const data = await executeMondayGraphQL<{ me: { id: string; name: string; email: string } }>(
-    QUERY_ME,
-    {},
-    apiKey
-  );
-  return data.me;
-}
-
-// 3. Fungsi Ambil Daftar Board
-export async function fetchUserBoards(apiKey?: string) {
-  const data = await executeMondayGraphQL<{
-    boards: Array<{ id: string; name: string; description?: string }>;
-  }>(QUERY_LIST_BOARDS, {}, apiKey);
-  return data.boards || [];
-}
-
-// 4. Fungsi Ambil Data Board & Item
-export async function fetchMondayBoard(boardId: string, apiKey?: string) {
-  const data = await executeMondayGraphQL<{ boards: any[] }>(
-    QUERY_GET_BOARD_ITEMS,
-    { boardId: [boardId] },
-    apiKey
-  );
-
-  const board = data.boards?.[0];
-  if (!board) throw new Error(`Board ID "${boardId}" tidak ditemukan.`);
-
-  // Cari kolom status secara dinamis
-  const statusColumn = board.columns.find(
-    (col: any) => col.type === 'status' || col.id === 'status' || col.title.toLowerCase().includes('status')
-  );
-
-  const tasks: Task[] = board.items_page.items.map((item: any) => {
-    const statusVal = item.column_values.find((c: any) => c.id === statusColumn?.id || c.type === 'status');
-    const priorityVal = item.column_values.find((c: any) => c.title?.toLowerCase().includes('priority'));
-
-    return {
-      id: item.id,
-      title: item.name,
-      status: normalizeMondayStatus(statusVal?.text),
-      priority: priorityVal?.text?.toLowerCase() || 'medium',
-      mondayId: item.id,
-    };
-  });
-
-  return {
-    board: {
-      id: board.id,
-      name: board.name,
-      statusColumnId: statusColumn?.id || 'status',
-    },
-    tasks,
-  };
-}
-
-// 5. Fungsi Buat Item Task
-export async function createMondayItem(
-  boardId: string,
-  itemName: string,
-  status: TaskStatus = 'todo',
-  priority: TaskPriority = 'medium',
-  statusColumnId: string = 'status',
-  apiKey?: string
-) {
-  const data = await executeMondayGraphQL<{ create_item: { id: string; name: string } }>(
-    MUTATION_CREATE_ITEM,
-    { boardId, itemName },
-    apiKey
-  );
-
-  const newItem = data.create_item;
-
-  // Set nilai status awal jika ada
-  try {
-    await executeMondayGraphQL(
-      MUTATION_UPDATE_STATUS,
-      {
-        boardId,
-        itemId: newItem.id,
-        columnId: statusColumnId,
-        value: toMondayStatusLabel(status),
-      },
-      apiKey
-    );
-  } catch (e) {
-    console.warn('Gagal mengatur label status kolom:', e);
-  }
-
-  return {
-    id: newItem.id,
-    title: newItem.name,
-    status,
-    priority,
-    mondayId: newItem.id,
-  } as Task;
-}
-
-// 6. Fungsi Ubah Status
-export async function updateMondayItemStatus(
-  boardId: string,
-  itemId: string,
-  status: TaskStatus,
-  statusColumnId: string = 'status',
-  apiKey?: string
-) {
-  return await executeMondayGraphQL(
-    MUTATION_UPDATE_STATUS,
-    {
-      boardId,
-      itemId,
-      columnId: statusColumnId,
-      value: toMondayStatusLabel(status),
-    },
-    apiKey
-  );
-}
-
-// 7. Fungsi Hapus Item
-export async function deleteMondayItem(itemId: string, apiKey?: string) {
-  return await executeMondayGraphQL(MUTATION_DELETE_ITEM, { itemId }, apiKey);
-}
 ```
 
----
+* **Kenapa header `'API-Version': '2024-01'` harus disertakan?**  
+  Monday.com memperbarui API secara berkala. Menentukan versi menjamin query kita tidak akan mendadak rusak saat Monday.com merilis fitur baru di masa depan.
+* **Kenapa harus mengecek `result.errors`?**  
+  Pada GraphQL, meskipun query salah (misal ID board tidak ditemukan), server tetap mengembalikan status HTTP `200 OK`. Namun di dalam body JSON ada properti `errors: [...]`. Kode di atas mendeteksi ini dan melempar pesan error yang ramah.
 
-## Langkah 6: Membangun Backend API Route Next.js (`app/api/monday/route.ts`)
-
-File API Route ini menghubungkan browser klien dengan Monday.com secara aman:
-
+#### 2. Deteksi Kolom Dinamis: Mengapa Tidak Hardcode `status`?
+Perhatikan baris kode pada fungsi `fetchMondayBoard`:
 ```typescript
-// app/api/monday/route.ts
-import { NextResponse } from 'next/server';
-import {
-  fetchMondayBoard,
-  fetchUserBoards,
-  testMondayConnection,
-  createMondayItem,
-  updateMondayItemStatus,
-  deleteMondayItem,
-  executeMondayGraphQL,
-} from '@/lib/monday';
-
-// GET: Membaca board dan tasks
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const apiKey = searchParams.get('apiKey') || process.env.MONDAY_API_KEY;
-  const boardIdParam = searchParams.get('boardId') || process.env.MONDAY_BOARD_ID;
-  const action = searchParams.get('action');
-
-  if (action === 'boards') {
-    const boards = await fetchUserBoards(apiKey);
-    return NextResponse.json({ success: true, boards });
-  }
-
-  if (!apiKey) {
-    return NextResponse.json({ isLive: false, message: 'Mode Demo' });
-  }
-
-  let activeBoardId = boardIdParam;
-  const userBoards = await fetchUserBoards(apiKey);
-  if (!activeBoardId && userBoards.length > 0) {
-    activeBoardId = userBoards[0].id;
-  }
-
-  const result = await fetchMondayBoard(activeBoardId!, apiKey);
-  return NextResponse.json({
-    isLive: true,
-    availableBoards: userBoards,
-    ...result,
-  });
-}
-
-// POST: Membuat task, uji koneksi, atau jalankan custom GraphQL
-export async function POST(request: Request) {
-  const body = await request.json();
-  const { action, apiKey: clientKey, boardId: clientBoardId } = body;
-  const apiKey = clientKey || process.env.MONDAY_API_KEY;
-  const boardId = clientBoardId || process.env.MONDAY_BOARD_ID;
-
-  if (action === 'test') {
-    const user = await testMondayConnection(apiKey);
-    return NextResponse.json({ success: true, message: `Terhubung sebagai ${user.name}`, user });
-  }
-
-  if (action === 'create') {
-    const { title, status = 'todo', priority = 'medium', statusColumnId = 'status' } = body;
-    const newTask = await createMondayItem(boardId, title, status, priority, statusColumnId, apiKey);
-    return NextResponse.json({ success: true, task: newTask });
-  }
-
-  if (action === 'run_graphql') {
-    const { query, variables = {} } = body;
-    const result = await executeMondayGraphQL(query, variables, apiKey);
-    return NextResponse.json({ success: true, data: result });
-  }
-
-  return NextResponse.json({ error: 'Aksi tidak valid' }, { status: 400 });
-}
-
-// PATCH: Ubah status task
-export async function PATCH(request: Request) {
-  const body = await request.json();
-  const { itemId, status, statusColumnId = 'status', apiKey: clientKey, boardId: clientBoardId } = body;
-  const apiKey = clientKey || process.env.MONDAY_API_KEY;
-  const boardId = clientBoardId || process.env.MONDAY_BOARD_ID;
-
-  await updateMondayItemStatus(boardId, itemId, status, statusColumnId, apiKey);
-  return NextResponse.json({ success: true });
-}
-
-// DELETE: Hapus task
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const itemId = searchParams.get('itemId')!;
-  const apiKey = searchParams.get('apiKey') || process.env.MONDAY_API_KEY;
-
-  await deleteMondayItem(itemId, apiKey);
-  return NextResponse.json({ success: true });
-}
+const statusColumn = board.columns.find(
+  (col) => col.type === 'status' || col.id === 'status' || col.title.toLowerCase().includes('status')
+);
 ```
+* **Kenyataan di Lapangan:**  
+  Pada akun Monday.com Anda, kolom status bernama **`project_status`**, bukan `status`!  
+  Jika programmer pemula melakukan *hardcode* `column_id = "status"`, aplikasinya akan langsung error dan task tidak akan muncul.  
+  Dengan mencari `col.type === 'status'`, kode kita **100% fleksibel** dan bisa bekerja di board milik siapa saja!
 
 ---
 
-## Langkah 7: Konfigurasi Styling, Font & Warna Monday (`app/globals.css` & `app/layout.tsx`)
+### D. `app/api/monday/route.ts` (Satpam Backend & Jembatan CORS)
 
-### A. Font Google Geist di `app/layout.tsx`:
-```tsx
-// app/layout.tsx
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+File ini berjalan di server Next.js (Node.js runtime).
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+#### 1. Mengapa Browser Butuh File Ini?
+Jika kode React di browser langsung memanggil `fetch('https://api.monday.com/v2')`:
+1. **Bahaya Keamanan Fatal**: Siapa pun bisa menekan tombol `F12` (Inspect Element) > tab Network, lalu melihat token rahasia Anda. Dengan token itu, orang lain bisa membaca atau menghapus seluruh proyek di Monday.com Anda!
+2. **Diblokir CORS**: Browser modern memiliki aturan keamanan ketat bernama **CORS (Cross-Origin Resource Sharing)** yang melarang JavaScript browser memanggil API domain lain tanpa izin server.
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+Dengan meletakkan panggilan di `app/api/monday/route.ts`:
+* Browser hanya berbicara dengan server lokalnya sendiri (`/api/monday`).
+* Server Next.js yang memanggil Monday.com secara aman di latar belakang. Kunci API Anda tetap aman 100%!
 
-export const metadata: Metadata = {
-  title: "FlowBoard — Monday.com Task Manager",
-  description: "Modern task management integrated with Monday.com GraphQL API v2",
-};
+---
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
-        {children}
-      </body>
-    </html>
+### E. `app/page.tsx` (Antarmuka React & Optimistic UI)
+
+File ini mengatur apa yang Anda lihat di layar monitor.
+
+#### 1. Mengapa Ada Baris `'use client'` di Paling Atas?
+```typescript
+'use client';
+```
+Di Next.js (App Router), semua file secara default adalah **Server Component** (dibuat di server, tidak bisa ada klik tombol atau form input).  
+Menulis `'use client'` memberitahu Next.js: *"File ini adalah Client Component yang membutuhkan interaktivitas pengguna (klik tombol, form input, state, useEffect)."*
+
+#### 2. Apa itu `useState`?
+```typescript
+const [tasks, setTasks] = useState<Task[]>([]);
+```
+* **Kenapa tidak pakai variabel biasa seperti `let tasks = []`?**  
+  Dalam React, jika Anda mengubah variabel biasa `tasks.push(newTask)`, React **tidak tahu** bahwa ada data baru, sehingga tampilan layar tidak akan diperbarui (*re-render*).  
+  Dengan `setTasks(...)`, React langsung menyadari ada perubahan data dan menggambar ulang layar seketika!
+
+#### 3. Apa itu *Optimistic UI Update*?
+Perhatikan fungsi saat Anda mengklik status task:
+```typescript
+// 1. Langsung ubah status di state layar seketika! (Pengguna tidak perlu menunggu)
+setTasks((prev) =>
+  prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
+);
+
+// 2. Kirim update ke server di latar belakang
+const res = await fetch('/api/monday', { method: 'PATCH', ... });
+
+// 3. Jika internet putus atau server gagal, kembalikan status ke semula (Rollback)
+if (!res.ok) {
+  setTasks((prev) =>
+    prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t))
   );
 }
 ```
+* **Kenapa disebut Optimistic?**  
+  Karena kita "optimis" bahwa koneksi internet pasti berhasil. Pengguna merasa aplikasinya **secepat kilat** tanpa jeda loading berputar-putar. Namun jika gagal, sistem secara pintar mengembalikan posisinya (*rollback*).
 
-### B. Palet Warna & Utility di `app/globals.css`:
-```css
-/* app/globals.css */
-@import "tailwindcss";
-@import "tw-animate-css";
+---
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
-  --color-primary: var(--primary);
-  --color-card: var(--card);
-  --color-border: var(--border);
-  --radius: 0.75rem;
-}
+## 5. Pertanyaan Kritis yang Sering Ditanyakan Pemula (FAQ Junior)
 
-:root {
-  --background: oklch(0.985 0.005 240);
-  --foreground: oklch(0.18 0.02 250);
-  --card: oklch(1 0 0);
-  --primary: oklch(0.55 0.22 255); /* Monday Blue: #0073ea */
-  --border: oklch(0.90 0.01 240);
-  --input: oklch(0.88 0.015 240);
-  --ring: oklch(0.55 0.22 255);
+### Q1: Apa bedanya file `.env` dan `.env.local`?
+* `.env`: Berisi nilai default yang biasanya di-commit ke Git (tanpa kunci rahasia).
+* `.env.local`: Khusus untuk komputer lokal Anda. Berisi kunci rahasia sungguhan dan **TIDAK PERNAH** boleh di-push ke GitHub publik.
+
+### Q2: Mengapa di GraphQL tidak ada error 404 saat data kosong?
+GraphQL menganggap *"data tidak ada"* adalah sebuah respon yang valid. Server tetap menjawab HTTP `200 OK`, namun isi objeknya adalah `{ data: { boards: [] } }` (array kosong).
+
+### Q3: Mengapa kartu task saya sebelumnya tidak ada padding atau terlihat aneh?
+Karena pada Tailwind CSS v4, variabel font Geist harus dihubungkan dengan benar di `globals.css` (`--font-sans: var(--font-geist-sans)`), dan komponen Card harus memiliki padding jelas (`p-5 sm:p-6`) bukan bergantung pada formula kalkulasi `--card-spacing` yang belum didefinisikan.
+
+---
+
+## 6. Kamus Istilah untuk Junior Developer
+
+| Istilah | Penjelasan Sederhana |
+|---|---|
+| **GraphQL** | Bahasa permintaan data di mana klien meminta persis field data yang diinginkan dari server. |
+| **Query** | Operasi GraphQL untuk **membaca / mengambil** data tanpa mengubah data di server. |
+| **Mutation** | Operasi GraphQL untuk **menulis, mengedit, atau menghapus** data di server. |
+| **Payload** | Data inti yang dikirimkan atau diterima dalam sebuah transaksi HTTP. |
+| **CORS** | Sistem keamanan browser yang mencegah website asing membaca data dari server tanpa izin. |
+| **Optimistic UI** | Teknik UI di mana layar langsung berubah seketika sebelum respon server selesai diterima. |
+| **Type Safety** | Perlindungan kode oleh TypeScript agar tidak terjadi salah ketik nama variabel atau fungsi. |
+| **Bearer Token** | Tiket otentikasi digital yang membuktikan bahwa pemegang tiket memiliki izin akses resmi. |
+
+---
+
+## 7. Latihan Praktik Mandiri
+
+Untuk menguji pemahaman Anda, cobalah lakukan 2 tantangan kecil ini:
+
+### 🎯 Tantangan 1: Coba Buat Task Lewat GraphQL Explorer
+1. Buka browser di **[http://localhost:3000](http://localhost:3000)**.
+2. Klik tombol **GraphQL Explorer** di navbar atas.
+3. Pilih preset **`4. Buat Task Baru (create_item)`**.
+4. Ubah nama task menjadi: `"Task Belajar Mandiri"`.
+5. Klik tombol hijau **"Jalankan Query"**.
+6. Refresh papan FlowBoard atau akun Monday.com Anda. Task baru Anda akan langsung muncul!
+
+### 🎯 Tantangan 2: Eksplorasi Profil User
+Pilih preset **`1. Cek Profil Akun (me)`** di GraphQL Explorer, tambahkan field `is_guest` atau `account { id name }`:
+```graphql
+query {
+  me {
+    id
+    name
+    email
+    account {
+      id
+      name
+    }
+  }
 }
 ```
+Klik **Jalankan Query** dan amati bagaimana GraphQL mengembalikan informasi akun workspace Monday.com Anda!
 
 ---
 
-## Langkah 8: Menyiapkan Komponen UI (`components/ui/`)
-
-Pastikan komponen dasar Card, Button, Input, dan Badge telah terpasang dengan rapi:
-* [`components/ui/card.tsx`](file:///Users/herlambangk/FileKu/Bermain/monday/monday-app/components/ui/card.tsx) (menggunakan `rounded-2xl border border-border/80 shadow-xs`)
-* [`components/ui/button.tsx`](file:///Users/herlambangk/FileKu/Bermain/monday/monday-app/components/ui/button.tsx) (menggunakan ukuran `h-9` dan `h-10` dengan hover shadow)
-* [`components/ui/input.tsx`](file:///Users/herlambangk/FileKu/Bermain/monday/monday-app/components/ui/input.tsx) (tinggi `h-9` dengan focus ring lembut)
-* [`components/ui/badge.tsx`](file:///Users/herlambangk/FileKu/Bermain/monday/monday-app/components/ui/badge.tsx) (pills bulat dengan teks proporsional)
-
----
-
-## Langkah 9: Membangun Halaman Utama & GraphQL Explorer (`app/page.tsx`)
-
-Buka file [`app/page.tsx`](file:///Users/herlambangk/FileKu/Bermain/monday/monday-app/app/page.tsx). File ini menggabungkan seluruh fitur:
-1. **Panggilan Asinkron**: Mengambil data board saat komponen dimuat.
-2. **Optimistic UI Updates**: Status berpindah seketika di layar saat diklik (*To Do* ➔ *Working on it* ➔ *Done*), lalu melakukan mutasi GraphQL di background.
-3. **GraphQL Explorer Drawer**: Panel uji query real-time dengan pilihan preset query, input variabel JSON, dan kotak hasil JSON response.
-
----
-
-## Langkah 10: Menjalankan & Menguji Aplikasi Secara Live
-
-1. **Jalankan development server**:
-   ```bash
-   npm run dev
-   ```
-2. **Akses di Browser**:
-   Buka **`http://localhost:3000`**.
-3. **Hasil yang Terlihat**:
-   - Status **🟢 Live** menampilkan nama board Anda: **"My first project"**.
-   - Menampilkan ketiga task asli Anda:
-     1. **Belajar Fundamental** (*Working on it*, High)
-     2. **Task 2** (*Done*)
-     3. **Task 3** (*Done*)
-   - Mengklik status langsung mengubah nilai kolom `project_status` di Monday.com!
-   - Membuka tab **GraphQL Explorer** menampilkan kode query yang dikirimkan ke server.
-
----
-
-## 13. Troubleshooting & FAQ
-
-#### 1. Mengapa Query Mengembalikan `Not Authenticated`?
-Pastikan Personal API Token tidak terpotong saat disalin dan header `Authorization` dikirim tanpa kata "Bearer" jika menggunakan API v2 Monday.
-
-#### 2. Mengapa Status Tidak Berubah di Board?
-Setiap board Monday.com memiliki ID kolom status yang berbeda. Pada board default adalah `status`, namun pada template project adalah `project_status`. Kode di `lib/monday.ts` telah menangani hal ini secara dinamis dengan mendeteksi kolom `type === "status"`.
-
-#### 3. Bagaimana Memastikan Token Aman?
-Simpan token hanya di `.env.local` atau masukkan melalui form UI di sesi browser lokal. Jangan pernah melakukan `git commit` pada token rahasia ke repositori publik!
-
----
-
-*Selamat! Anda kini telah menguasai alur penuh integrasi GraphQL Monday.com dari nol hingga siap produksi!* 🚀
+*Selamat belajar! Sekarang Anda tidak hanya bisa menjalankan kodenya, tetapi juga paham mengapa setiap baris kode ditulis.* 🚀
